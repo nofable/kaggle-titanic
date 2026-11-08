@@ -25,7 +25,7 @@ Goal: predict `Survived` (0/1) for the 418 passengers in `test.csv`. Scored on *
 - [x] **6. Converge** — pick an approach to take forward and justify it.
 - [x] ~~**7. PyTorch model**~~ — dropped (see ground rule 4).
 - [x] **8. Submit** — generate `submission.csv`, submit to Kaggle, record score.
-- [ ] **9. Ship** — tidy repo, README, push to GitHub.
+- [x] **9. Ship** — tidy repo, README, push to GitHub.
 
 ## Data on disk
 
@@ -84,6 +84,15 @@ Goal: predict `Survived` (0/1) for the 418 passengers in `test.csv`. Scored on *
   2. Candidate explanations to weigh: noise (1 passenger = 0.24%), selection optimism from the 54-combo grid, overfitting to small train-only patterns (Deck G, Cherbourg 3rd-class women, FamilySize 5+), train/test mix differences.
   3. Housekeeping: bump `.python-version` from 3.9 to 3.12 (fixes the NotOpenSSL warning and the matmul warnings, and lets the project's `kaggle` CLI (≥1.8) read `~/.kaggle/access_token`). Until then, submit with `uvx --python 3.12 --with six kaggle@2.2.5 competitions submit -c titanic -f submission.csv -m "..."`.
   4. Step 9: push to personal GitHub.
+
+### Session 1 close — 2026-11-08
+- Second submission (simple depth-3 tree, sex + age + pclass): **LB 0.76076**. All submissions are within 3 passengers; every model drops from CV to LB, so the test set is near the noise ceiling.
+- Printed the depth-3 tree: the only men it flips are boys ≤13 in 1st/2nd class (12/12 survived). 1st-class adult men are 35% survival, still a minority, so class adds probability but no accuracy. The train ceiling for that tree is 723/891 = 0.811.
+- **Retrospective (William asked for direct feedback once the exercise was done):**
+  - *Missed unlock:* group survival / woman–child-group feature (outcomes of the rest of a passenger's family or ticket group), computed from training-fold labels only. Typically lifts LB to ~0.80–0.82.
+  - *Revisit:* Deck one-hot (8 columns on ~200 mostly-1st-class rows); skipped the ablation tests; Embarked kept on small subgroups; Embarked imputation (history says Icard and Stone boarded at Southampton); top-of-grid selection.
+  - *Strong:* FarePerPerson, title-based Age imputation + masking test, AgeMissing flag, stratified repeated CV + baselines first, simple-model diagnostic, dropping PyTorch.
+- Removed the email from pyproject, and set the repo's git author email to the GitHub noreply address. Pushed to personal GitHub (nofable/kaggle-titanic, public).
 
 ## Checkpoint — end of Step 4 (2026-11-08)
 
@@ -239,6 +248,9 @@ Goal: predict `Survived` (0/1) for the 418 passengers in `test.csv`. Scored on *
 
 | 7 | GB grid search: 54 combos (lr 0.01/0.05/0.1 × trees 100/300/500 × depth 2/3/4 × subsample 0.8/1.0) | best 0.8421 ± 0.0067 (lr 0.01, 500 trees, depth 4, subsample 0.8; train 0.9124) | `scripts/tune_gb.py`, full table in `results/gb_grid.csv`. +0.7 pt over default, about 1 SE. 4 combos within 1 SE of best. Best score is optimistic (selection bias) |
 | 8 | **Kaggle submission**: tuned GB (exp 7 settings) fit on all 891 rows | **Public LB 0.75837** (317/418 correct) | CV said 0.8421. ~8-point drop. Below the gender rule's widely reported LB of 0.76555 (320/418), i.e. 3 passengers worse. Submitted 2026-11-08 |
+| 9 | Simple model, Sex + Age + Pclass only (5 columns) | LR 0.7924 · tree d3 0.8025 · tree d5 0.7916 · GB default 0.8036 · GB tuned 0.8081 (all ± ~0.007) | `scripts/simple_model.py`. Overrides vs the gender rule on test: 8–37 (full model: ~51). Submission files in `submissions/`. Not yet submitted |
+| 10 | Simple + CabinKnown (6 columns) | LR 0.7987 · tree d3 0.7917 · tree d5 0.7864 · GB default 0.7965 · GB tuned 0.8032 | No improvement over exp 9 (all within noise, some lower). CabinKnown's signal seems mostly redundant with Pclass + Sex once both are in the model |
+| 11 | **Kaggle submission**: simple decision tree depth 3 (sex + age + pclass), exp 9 | **Public LB 0.76076** (318/418) | +1 passenger vs the full model (0.75837), still 2 below the gender rule (0.76555). CV 0.8025 → LB 0.761: the simple model shows a CV → LB drop too. William's direction: keep the model as simple as possible. Dropped CabinKnown (exp 10) |
 
 Experiments 1–6: `scripts/cheap_models.py`, stratified 10-fold × 3, untuned. ± = standard error over 30 folds (understated, since folds overlap).
 
